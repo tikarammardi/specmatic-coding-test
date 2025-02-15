@@ -80,5 +80,31 @@ class Products {
         return ResponseEntity.status(HttpStatus.CREATED).body(ProductId(id))
     }
 
-
+    /**
+     * GET /products?type={type}
+     * Returns:
+     * - 200 with a list of products.
+     * - 400 if an invalid product type is provided.
+     */
+    @GetMapping
+    fun getProducts(
+        @RequestParam(required = false) type: String?,
+        request: HttpServletRequest
+    ): ResponseEntity<Any> {
+        if (type != null && type !in allowedTypes) {
+            val error = ErrorResponseBody(
+                timestamp = LocalDateTime.now(),
+                status = HttpStatus.BAD_REQUEST.value(),
+                error = "Invalid product type: $type",
+                path = request.requestURI
+            )
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
+        }
+        val result = if (type != null) {
+            productsMap.values.filter { it.type.equals(type, ignoreCase = true) }
+        } else {
+            productsMap.values.toList()
+        }
+        return ResponseEntity.ok(result)
+    }
 }
