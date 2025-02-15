@@ -20,74 +20,54 @@ class Products {
     private val productsMap = ConcurrentHashMap<Int, Product>()
     private val productIdGenerator = AtomicInteger(1)
 
-    /**
-     * POST /products
-     * Returns:
-     * - 201 with ProductId on success.
-     * - 400 with an ErrorResponseBody on invalid input.
-     */
+
+    private fun errorResponse(status: HttpStatus, message: String, request: HttpServletRequest): ResponseEntity<Any> =
+        ResponseEntity.status(status).body(
+            ErrorResponseBody(
+                timestamp = LocalDateTime.now(),
+                status = status.value(),
+                error = message,
+                path = request.requestURI
+            )
+        )
+
+    // Consolidated validation function
+    private fun validateProductDetails(details: ProductDetails, request: HttpServletRequest): ResponseEntity<Any>? {
+        // Validate product name: must not be blank, contain any digits,
+        // or equal "true"/"false" (case-insensitive)
+        if (details.name.isBlank() ||
+            details.name.any { it.isDigit() } ||
+            details.name.equals("true", ignoreCase = true) ||
+            details.name.equals("false", ignoreCase = true)
+        ) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Product name cannot be blank or contain numbers", request)
+        }
+        // Validate product type
+        if (details.type !in allowedTypes) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Invalid product type: ${details.type}", request)
+        }
+        // Validate inventory range
+        if (details.inventory !in 1..9999) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Inventory must be between 1 and 9999", request)
+        }
+        // Validate cost: it must be provided and non-negative
+        if (details.cost == null) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Cost must be provided", request)
+        }
+        if (details.cost < 0.0) {
+            return errorResponse(HttpStatus.BAD_REQUEST, "Cost must be non-negative", request)
+        }
+        return null
+    }
+
     @PostMapping
     fun createProduct(
         @RequestBody productDetails: ProductDetails,
         request: HttpServletRequest
     ): ResponseEntity<Any> {
-        // Validate product name: must not be blank, contain any digits,
-        // or equal "true"/"false" (case-insensitive)
-        val name = productDetails.name
-        if (name.isBlank() ||
-            name.any { it.isDigit() } ||
-            name.equals("true", ignoreCase = true) ||
-            name.equals("false", ignoreCase = true)
-        ) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Product name cannot be blank or contain numbers",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
-        }
-        // Validate product type
-        if (productDetails.type !in allowedTypes) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Invalid product type: ${productDetails.type}",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
-        }
-        // Validate inventory range
-        if (productDetails.inventory < 1 || productDetails.inventory > 9999) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Inventory must be between 1 and 9999",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
-        }
-        // Validate cost: it must be provided and non-negative
-        if (productDetails.cost == null) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Cost must be provided",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
-        }
-        if (productDetails.cost < 0.0) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Cost must be non-negative",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
-        }
+        // Use the validation helper to check the input
+        validateProductDetails(productDetails, request)?.let { return it }
 
-        // Create new product (using cost!!)
         val id = productIdGenerator.getAndIncrement()
         val product = Product(
             id = id,
@@ -97,7 +77,6 @@ class Products {
             cost = productDetails.cost!!
         )
         productsMap[id] = product
-
         return ResponseEntity.status(HttpStatus.CREATED).body(ProductId(id))
     }
 
@@ -113,13 +92,7 @@ class Products {
         request: HttpServletRequest
     ): ResponseEntity<Any> {
         if (type != null && type !in allowedTypes) {
-            val error = ErrorResponseBody(
-                timestamp = LocalDateTime.now(),
-                status = HttpStatus.BAD_REQUEST.value(),
-                error = "Invalid product type: $type",
-                path = request.requestURI
-            )
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
+            return errorResponse(HttpStatus.BAD_REQUEST, "Invalid product type: $type", request)
         }
         val result = if (type != null) {
             productsMap.values.filter { it.type.equals(type, ignoreCase = true) }
