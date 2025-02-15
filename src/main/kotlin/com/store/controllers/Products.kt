@@ -32,7 +32,8 @@ class Products {
         request: HttpServletRequest
     ): ResponseEntity<Any> {
         // Validate product name: Check if blank, contains digits,
-        // or equals "true"/"false" (case-insensitive)
+        // or equals "true"/"false" (case-insensitive) to prevent
+        // trigger pipeline
         val name = productDetails.name
         if (name.isBlank() ||
             name.any { it.isDigit() } ||
