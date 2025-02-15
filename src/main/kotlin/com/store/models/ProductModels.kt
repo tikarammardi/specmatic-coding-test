@@ -15,7 +15,8 @@ import java.time.LocalDateTime
 data class ProductDetails @JsonCreator constructor(
     @JsonProperty("name") val name: String,
     @JsonProperty("type") val type: String,
-    @JsonProperty("inventory") val inventory: Int
+    @JsonProperty("inventory") val inventory: Int,
+    @JsonProperty("cost") val cost: Double?
 )
 
 /**
@@ -36,7 +37,8 @@ data class Product(
     val id: Int,
     val name: String,
     val type: String,
-    val inventory: Int
+    val inventory: Int,
+    val cost: Double
 )
 
 /**

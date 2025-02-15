@@ -31,9 +31,8 @@ class Products {
         @RequestBody productDetails: ProductDetails,
         request: HttpServletRequest
     ): ResponseEntity<Any> {
-        // Validate product name: Check if blank, contains digits,
-        // or equals "true"/"false" (case-insensitive) to prevent
-        // trigger pipeline
+        // Validate product name: must not be blank, contain any digits,
+        // or equal "true"/"false" (case-insensitive)
         val name = productDetails.name
         if (name.isBlank() ||
             name.any { it.isDigit() } ||
@@ -68,13 +67,34 @@ class Products {
             )
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
         }
-        // Create new product
+        // Validate cost: it must be provided and non-negative
+        if (productDetails.cost == null) {
+            val error = ErrorResponseBody(
+                timestamp = LocalDateTime.now(),
+                status = HttpStatus.BAD_REQUEST.value(),
+                error = "Cost must be provided",
+                path = request.requestURI
+            )
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
+        }
+        if (productDetails.cost < 0.0) {
+            val error = ErrorResponseBody(
+                timestamp = LocalDateTime.now(),
+                status = HttpStatus.BAD_REQUEST.value(),
+                error = "Cost must be non-negative",
+                path = request.requestURI
+            )
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)
+        }
+
+        // Create new product (using cost!!)
         val id = productIdGenerator.getAndIncrement()
         val product = Product(
             id = id,
-            name = name,
+            name = productDetails.name,
             type = productDetails.type,
-            inventory = productDetails.inventory
+            inventory = productDetails.inventory,
+            cost = productDetails.cost!!
         )
         productsMap[id] = product
 
